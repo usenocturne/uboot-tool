@@ -1,7 +1,7 @@
 include:
-  - project: container-email/resources/gitlab-templates
-    ref: main
-    file: shellcheck.yml
+  - project: raspi-alpine/builder
+    ref: master
+    file: resources/CI/lint.yml
 
 stages:
 - lint
