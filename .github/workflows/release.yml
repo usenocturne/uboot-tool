@@ -19,5 +19,12 @@ jobs:
       - name: Build uboot_tool
         run: make uboot_tool -j$(nproc)
 
+      - name: Export SHA256 sum
+        run: sha256sum uboot_tool > uboot_tool.sha256
+
       - name: Add to release
-        run: gh release upload ${{github.event.release.tag_name}} uboot_tool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{github.event.release.tag_name}} uboot_tool
+          gh release upload ${{github.event.release.tag_name}} uboot_tool.sha256
