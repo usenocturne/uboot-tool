@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
-char* uboot_file = "/uboot/uboot.dat";
+char* uboot_file = "/uboot/boot.dat";
 
 
 void printHelp() {
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
         data[1] = 0;
 
         // boot partition
-        data[2] = 2; // A=2, B=3
+        data[2] = 5; // A=5, B=6
     }
 
     // handle commands
@@ -83,10 +83,10 @@ int main(int argc, char* argv[]) {
         printf("%d\n", data[2]);
 
     } else if (strcmp(cmd, "part_switch") == 0) {
-        if (data[2] == 2) {
-            data[2] = 3;
+        if (data[2] == 5) {
+            data[2] = 6;
         } else {
-            data[2] = 2;
+            data[2] = 5;
         }
         save = 1;
 
