@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <arpa/inet.h>
 
-char* uboot_file = "/uboot/boot.dat";
-
+char* uboot_file = "/uboot/uboot.dat";
 
 void printHelp() {
     printf("Usage: uboot_tool [COMMAND]\n");
@@ -11,6 +11,7 @@ void printHelp() {
     printf("Commands:\n");
     printf(" part_current  - show current partition\n");
     printf(" part_switch   - switch active partition\n");
+    printf(" counter       - show boot counter\n");
     printf(" reset_counter - reset boot counter\n");
     printf(" version       - show version of file\n");
 }
@@ -23,7 +24,7 @@ uint32_t crc32(uint8_t* data, size_t length, uint32_t seed) {
             if (crc & 1) {
                 crc = (crc >> 1) ^ 0xedb88320L;
             } else {
-                crc =  crc >> 1;
+                crc = crc >> 1;
             }
         }
     }
@@ -31,35 +32,31 @@ uint32_t crc32(uint8_t* data, size_t length, uint32_t seed) {
 }
 
 int main(int argc, char* argv[]) {
-    // show help if no command given
     if (argc < 2) {
         printHelp();
         return 1;
     }
     char* cmd = argv[1];
 
-    // read uboot file
     FILE* file = fopen(uboot_file, "rb");
     if (file == NULL) {
         printf("Failed to open uboot file: %s\n", uboot_file);
         return 2;
     }
+    
     uint8_t data[1024];
     size_t err = fread(data, 1, sizeof(data), file);
-    if (err == 0) {
-        printf("Failed to read uboot file: %s\n", uboot_file);
-        return 2;
-    }
     fclose(file);
 
-    // get crc from file
-    uint32_t crc = (data[1023] << 24) + 
-                   (data[1022] << 16) + 
-                   (data[1021] << 8) + 
-                    data[1020];
+    if (err != sizeof(data)) {
+        printf("Failed to read full uboot file: %s\n", uboot_file);
+        return 2;
+    }
 
-    // check if CRC is valid
-    if (crc != crc32(data, 0x3FC, 0)) {
+    uint32_t stored_crc = ntohl(*(uint32_t*)&data[1020]);
+    uint32_t computed_crc = crc32(data, 1020, 0);
+
+    if (stored_crc != computed_crc) {
         fprintf(stderr, "Invalid CRC -> fallback to default\n");
 
         memset(data, 0, sizeof(data));
@@ -71,10 +68,9 @@ int main(int argc, char* argv[]) {
         data[1] = 0;
 
         // boot partition
-        data[2] = 5; // A=5, B=6
+        data[2] = 2; // A=3, B=2
     }
 
-    // handle commands
     uint8_t save = 0;
     if (strcmp(cmd, "version") == 0) {
         printf("0x%02x\n", data[0]);
@@ -83,12 +79,11 @@ int main(int argc, char* argv[]) {
         printf("%d\n", data[2]);
 
     } else if (strcmp(cmd, "part_switch") == 0) {
-        if (data[2] == 5) {
-            data[2] = 6;
-        } else {
-            data[2] = 5;
-        }
+        data[2] = (data[2] == 5) ? 6 : 5;
         save = 1;
+
+    } else if (strcmp(cmd, "counter") == 0) {
+        printf("%d\n", data[1]);
 
     } else if (strcmp(cmd, "reset_counter") == 0) {
         data[1] = 0;
@@ -99,26 +94,22 @@ int main(int argc, char* argv[]) {
         return 10;
     }
 
-    if (save == 1) {
-        // calculate new CRC
-        crc = crc32(data, 0x3FC, 0);
-        data[1023] = (uint8_t)((crc & 0xFF000000U)>>24);
-        data[1022] = (uint8_t)((crc & 0x00FF0000U)>>16);
-        data[1021] = (uint8_t)((crc & 0x0000FF00U)>>8);
-        data[1020] = (uint8_t)((crc & 0x000000FFU));
+    if (save) {
+        computed_crc = crc32(data, 1020, 0);
+        *(uint32_t*)&data[1020] = htonl(computed_crc);
 
-        // write uboot file
         file = fopen(uboot_file, "wb");
         if (file == NULL) {
             printf("Failed to open uboot file: %s\n", uboot_file);
             return 4;
         }
-        size_t err = fwrite(data, 1, sizeof(data), file);
-        if (err == 0) {
-            printf("Failed to write uboot file: %s\n", uboot_file);
+        err = fwrite(data, 1, sizeof(data), file);
+        fclose(file);
+
+        if (err != sizeof(data)) {
+            printf("Failed to write full uboot file: %s\n", uboot_file);
             return 4;
         }
-        fclose(file);
     }
 
     return 0;
