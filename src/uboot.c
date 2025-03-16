@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
         printf("%d\n", data[2]);
 
     } else if (strcmp(cmd, "part_switch") == 0) {
-        data[2] = (data[2] == 5) ? 6 : 5;
+        data[2] = (data[2] == 2) ? 3 : 2;
         save = 1;
 
     } else if (strcmp(cmd, "counter") == 0) {
